@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Инвестиции">
+<meta name="theme-color" content="#1f3a5f">
+<title>Мои инвестиции</title>
+<style>
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#1d2433;--muted:#6b7280;--line:#e5e1d8;--accent:#1f3a5f;--good:#2f7d4f;--bad:#b4442c;--warn:#fff4cc}
+  @media (prefers-color-scheme: dark){:root{--bg:#14181f;--card:#1c222b;--ink:#e8e6e1;--muted:#9aa3b0;--line:#2c3440;--accent:#8fb3e0;--good:#6cc08b;--bad:#e58a73;--warn:#3a3420}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{padding:18px 16px 0;max-width:1100px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px;font-weight:600}
+  .sub{color:var(--muted);font-size:13px}
+  nav{display:flex;gap:6px;margin:14px 0 0;flex-wrap:wrap}
+  nav button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+  nav button.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  main{max-width:1100px;margin:0 auto;padding:16px}
+  section{display:none}section.on{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+  h2{font-size:17px;margin:0 0 10px;font-weight:600}
+  .hint{color:var(--muted);font-size:13px;margin:4px 0 10px}
+  .warnbox{background:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px;margin:8px 0}
+  .tbl{width:100%;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:500;font-size:12px;cursor:default}
+  th.sort{cursor:pointer}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+  input.s{width:90px}input.xs{width:70px}
+  textarea{width:100%;min-height:54px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  button.b{border:1px solid var(--accent);background:var(--accent);color:var(--bg);padding:7px 14px;border-radius:7px;cursor:pointer;font:inherit}
+  button.g{border:1px solid var(--line);background:transparent;color:var(--ink);padding:6px 12px;border-radius:7px;cursor:pointer;font:inherit}
+  button.x{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:16px}
+  .good{color:var(--good)}.bad{color:var(--bad)}.muted{color:var(--muted)}
+  .big{font-size:20px;font-weight:600}
+  .status{font-size:13px;color:var(--muted);min-height:18px}
+  footer{max-width:1100px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Мои инвестиции</h1>
+  <div class="sub">Цены — Московская биржа (данные с задержкой до 15 минут). Решения и сделки — только ваши.</div>
+  <nav>
+    <button data-tab="calc" class="on">Что докупить</button>
+    <button data-tab="screen">Фильтр бумаг</button>
+    <button data-tab="journal">Журнал сделок</button>
+    <button data-tab="backup">Сохранение</button>
+  </nav>
+</header>
+<main>
+
+<!-- КАЛЬКУЛЯТОР -->
+<section id="calc" class="on">
+  <div class="card">
+    <h2>1. Мои правила и портфель</h2>
+    <div class="hint">Добавьте бумаги по тикеру (SBER, TMOS…) или ISIN облигации (SU26238RMFS4…). Доля — сколько процентов портфеля вы хотите держать в этой бумаге. Сумма долей должна быть 100%. «Есть сейчас» — сколько штук у вас уже лежит (в приложении Т-Инвестиций это видно в позиции).</div>
+    <div class="row">
+      <input id="addTicker" placeholder="Тикер или ISIN" style="width:200px">
+      <button class="b" id="addBtn">Добавить</button>
+      <button class="g" id="refreshBtn">Обновить цены</button>
+      <span class="status" id="calcStatus"></span>
+    </div>
+    <div class="tbl"><table id="rulesTbl"></table></div>
+    <div class="row" id="sumLine"></div>
+  </div>
+  <div class="card">
+    <h2>2. Сколько вношу</h2>
+    <div class="row">
+      <input id="contrib" type="number" min="0" step="100" placeholder="Сумма, ₽" style="width:160px">
+      <label class="muted"><input type="checkbox" id="allowSell"> можно продавать лишнее</label>
+      <button class="b" id="planBtn">Посчитать</button>
+    </div>
+    <div id="planOut"></div>
+  </div>
+</section>
+
+<!-- ФИЛЬТР -->
+<section id="screen">
+  <div class="card">
+    <h2>Акции и фонды Мосбиржи</h2>
+    <div class="hint">Фильтр показывает факты, а не советы. Дивиденды и долги компаний в бесплатных данных биржи не публикуются — по ним спрашивайте Валеру в чате, разберём каждую компанию. Изменение за год и 3 года посчитано по биржевым ценам без учёта дивидендов; если у бумаги был сплит, стоит «сплит?».</div>
+    <div class="row">
+      <label><input type="checkbox" id="fIndex" checked> только из индекса Мосбиржи</label>
+      <label>оборот в день от <input id="fTurn" class="xs" type="number" value="50"> млн ₽</label>
+      <label>за год от <input id="fY1min" class="xs" type="number" placeholder="−∞"> до <input id="fY1max" class="xs" type="number" placeholder="+∞"> %</label>
+      <label>лот до <input id="fLot" class="s" type="number" placeholder="любой"> ₽</label>
+      <input id="fText" placeholder="поиск по названию" style="width:170px">
+      <button class="b" id="loadScreen">Загрузить</button>
+    </div>
+    <div class="status" id="screenStatus"></div>
+    <div class="tbl"><table id="screenTbl"></table></div>
+  </div>
+</section>
+
+<!-- ЖУРНАЛ -->
+<section id="journal">
+  <div class="card">
+    <h2>Новая запись</h2>
+    <div class="row">
+      <input id="jDate" type="date">
+      <select id="jSide"><option value="buy">Купила</option><option value="sell">Продала</option></select>
+      <input id="jTicker" placeholder="Тикер" class="s">
+      <input id="jQty" type="number" placeholder="Штук" class="xs">
+      <input id="jPrice" type="number" step="0.01" placeholder="Цена, ₽" class="s">
+    </div>
+    <textarea id="jWhy" placeholder="Почему я это делаю? Что ожидаю? При каком условии продам?"></textarea>
+    <div class="row"><button class="b" id="jAdd">Записать</button><span class="status" id="jStatus"></span></div>
+  </div>
+  <div class="card">
+    <h2>Мои сделки</h2>
+    <div class="hint">Через 30 дней после сделки строка подсвечивается — время вернуться и записать, что вышло и чему научило.</div>
+    <div class="tbl"><table id="jTbl"></table></div>
+  </div>
+</section>
+
+<!-- СОХРАНЕНИЕ -->
+<section id="backup">
+  <div class="card">
+    <h2>Сохранение данных</h2>
+    <div class="hint">Всё хранится в этом браузере на этом устройстве (телефон и ноутбук — отдельно). Если почистить историю браузера — данные пропадут. Раз в неделю нажимайте «Скачать копию» и кладите файл в папку D:\Мои проекты\инвестиции</div>
+    <div class="row">
+      <button class="b" id="expBtn">Скачать копию</button>
+      <label class="g" style="display:inline-block">Загрузить копию <input type="file" id="impFile" accept=".json" style="display:none"></label>
+      <span class="status" id="bStatus"></span>
+    </div>
+  </div>
+</section>
+</main>
+<footer>Это инструмент для расчётов и учёта. Он не знает будущего цен и ничего не рекомендует — он считает по правилам, которые задали вы.</footer>
+
+<script>
+const ISS = 'https://iss.moex.com/iss';
+const KEY = 'invest-app-v1';
+// Набор, выбранный 30.10.2026 (вариант 1 + денежный рынок на остаток); подставляется, пока в браузере ничего не сохранено
+const DEFAULT_RULES = [
+  {id:'YDEX', target:23, have:0}, {id:'HEAD', target:18, have:0}, {id:'DOMRF', target:14, have:0},
+  {id:'TRNFP', target:7, have:0}, {id:'TMOS', target:23, have:0}, {id:'TMON', target:15, have:0}];
+let S = load();
+function load(){ try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s) return Object.assign({rules:[],journal:[]}, s);}catch(e){} return {rules:DEFAULT_RULES.map(r=>({...r})),journal:[]}; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ alert('Не удалось сохранить: '+e.message); } }
+const $ = id => document.getElementById(id);
+const fmt = (n,d=0) => n==null||isNaN(n) ? '—' : n.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rows = (block) => block ? block.data.map(r => Object.fromEntries(block.columns.map((c,i)=>[c,r[i]]))) : [];
+async function getJSON(url){ const r = await fetch(url); if(!r.ok) throw new Error('биржа ответила '+r.status); return r.json(); }
+
+// вкладки
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on', x===b));
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on', s.id===b.dataset.tab));
+  if(b.dataset.tab==='journal') renderJournal();
+});
+
+// ---------- котировки ----------
+const quotes = {}; // SECID -> {name, kind, lot, price, lotPrice, board}
+async function fetchShares(ids){
+  const j = await getJSON(`${ISS}/engines/stock/markets/shares/boards/TQBR/securities.json?iss.meta=off&iss.only=securities,marketdata&securities=${ids.join(',')}`);
+  const md = Object.fromEntries(rows(j.marketdata).map(r=>[r.SECID,r]));
+  rows(j.securities).forEach(s=>{
+    const m = md[s.SECID]||{}; const price = m.LAST ?? m.MARKETPRICE ?? s.PREVPRICE;
+    quotes[s.SECID] = {name:s.SHORTNAME, kind:'акция/фонд', lot:s.LOTSIZE, price, lotPrice: price*s.LOTSIZE};
+  });
+}
+async function fetchBonds(ids){
+  for(const board of ['TQOB','TQCB']){
+    const left = ids.filter(i=>!quotes[i]); if(!left.length) return;
+    const j = await getJSON(`${ISS}/engines/stock/markets/bonds/boards/${board}/securities.json?iss.meta=off&iss.only=securities,marketdata&securities=${left.join(',')}`);
+    const md = Object.fromEntries(rows(j.marketdata).map(r=>[r.SECID,r]));
+    rows(j.securities).forEach(s=>{
+      const m = md[s.SECID]||{}; const pct = m.LAST ?? m.MARKETPRICE ?? s.PREVPRICE;
+      const rub = (s.FACEUNIT==='SUR'||s.FACEUNIT==='RUB');
+      const one = pct/100*s.FACEVALUE + (s.ACCRUEDINT||0);
+      quotes[s.SECID] = {name:s.SHORTNAME, kind: rub?'облигация':'облигация ('+s.FACEUNIT+')', lot:s.LOTSIZE, price: one, lotPrice: one*s.LOTSIZE,
+        note: rub?`${fmt(pct,2)}% от номинала + НКД, погашение ${s.MATDATE}`:'номинал не в рублях — цена посчитана неверно, лучше не использовать', foreign:!rub};
+    });
+  }
+}
+async function refreshQuotes(ids){
+  ids = [...new Set(ids.map(i=>i.toUpperCase()))]; if(!ids.length) return;
+  for(let i=0;i<ids.length;i+=10) await fetchShares(ids.slice(i,i+10));
+  const left = ids.filter(i=>!quotes[i]);
+  for(let i=0;i<left.length;i+=10) await fetchBonds(left.slice(i,i+10));
+}
+
+// ---------- калькулятор ----------
+// комиссия брокера на тарифе «Инвестор»: 0,3%; фонды Т-Капитала — без комиссии
+const FREE_FUNDS = ['TMOS','TMON','TRUR','TBRU','TOFZ','TGLD','TDIV','TITR','TRND','TLCB','TPAY'];
+const fee = id => FREE_FUNDS.includes(id) ? 0 : 0.003;
+function renderRules(){
+  const t = $('rulesTbl');
+  if(!S.rules.length){ t.innerHTML = '<tr><td class="muted">Пока пусто. Добавьте первую бумагу.</td></tr>'; $('sumLine').innerHTML=''; return; }
+  let total = 0;
+  S.rules.forEach(r=>{ const q=quotes[r.id]; if(q) total += q.price*(r.have||0); });
+  t.innerHTML = '<tr><th>Бумага</th><th>Тип</th><th class="num">Цена за шт.</th><th class="num">Лот, шт.</th><th class="num">Лот, ₽</th><th class="num">Есть сейчас, шт.</th><th class="num">Стоит</th><th class="num">Сейчас доля</th><th class="num">Хочу доля, %</th><th></th></tr>' +
+    S.rules.map((r,i)=>{ const q = quotes[r.id]||{}; const val = q.price!=null ? q.price*(r.have||0) : null;
+      return `<tr><td><b>${esc(r.id)}</b> <span class="muted">${esc(q.name||'')}</span>${q.note?`<div class="muted" style="font-size:12px">${esc(q.note)}</div>`:''}</td><td>${esc(q.kind||'?')}</td>
+      <td class="num">${fmt(q.price,2)}</td><td class="num">${fmt(q.lot)}</td><td class="num">${fmt(q.lotPrice,0)}</td>
+      <td class="num"><input class="xs" type="number" min="0" value="${r.have||0}" data-i="${i}" data-f="have"></td>
+      <td class="num">${fmt(val)}</td><td class="num">${total?fmt(val/total*100,1)+'%':'—'}</td>
+      <td class="num"><input class="xs" type="number" min="0" max="100" step="1" value="${r.target||0}" data-i="${i}" data-f="target"></td>
+      <td><button class="x" data-del="${i}" title="Убрать">×</button></td></tr>`; }).join('');
+  const sum = S.rules.reduce((a,r)=>a+(+r.target||0),0);
+  $('sumLine').innerHTML = `<span>Портфель по этим бумагам: <b>${fmt(total)} ₽</b></span> · <span class="${Math.abs(sum-100)<0.01?'good':'bad'}">Сумма долей: ${fmt(sum,1)}%${Math.abs(sum-100)<0.01?'':' — должно быть 100%'}</span>`;
+  t.querySelectorAll('input').forEach(inp=>inp.onchange=()=>{ S.rules[inp.dataset.i][inp.dataset.f] = +inp.value||0; save(); renderRules(); });
+  t.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ S.rules.splice(+b.dataset.del,1); save(); renderRules(); });
+}
+async function refreshCalc(){
+  $('calcStatus').textContent='Загружаю цены…';
+  try{ await refreshQuotes(S.rules.map(r=>r.id)); const miss=S.rules.filter(r=>!quotes[r.id]).map(r=>r.id);
+    $('calcStatus').textContent = miss.length ? 'Не нашёл на бирже: '+miss.join(', ') : 'Цены обновлены '+new Date().toLocaleTimeString('ru-RU');
+  }catch(e){ $('calcStatus').textContent='Ошибка: '+e.message; }
+  renderRules();
+}
+$('addBtn').onclick = async ()=>{
+  const id = $('addTicker').value.trim().toUpperCase(); if(!id) return;
+  if(S.rules.some(r=>r.id===id)){ $('calcStatus').textContent='Уже есть в списке'; return; }
+  $('calcStatus').textContent='Ищу '+id+'…';
+  try{ await refreshQuotes([id]); }catch(e){ $('calcStatus').textContent='Ошибка: '+e.message; return; }
+  if(!quotes[id]){ $('calcStatus').textContent='Не нашёл '+id+' на основных режимах торгов Мосбиржи'; return; }
+  S.rules.push({id, target:0, have:0}); save(); $('addTicker').value=''; $('calcStatus').textContent='Добавил '+quotes[id].name; renderRules();
+};
+$('addTicker').onkeydown = e=>{ if(e.key==='Enter') $('addBtn').click(); };
+$('refreshBtn').onclick = refreshCalc;
+
+$('planBtn').onclick = async ()=>{
+  const out = $('planOut');
+  const sum = S.rules.reduce((a,r)=>a+(+r.target||0),0);
+  if(!S.rules.length){ out.innerHTML='<div class="warnbox">Сначала добавьте бумаги и доли.</div>'; return; }
+  if(Math.abs(sum-100)>0.01){ out.innerHTML='<div class="warnbox">Сумма долей должна быть 100%, сейчас '+fmt(sum,1)+'%.</div>'; return; }
+  await refreshCalc();
+  const bad = S.rules.filter(r=>!quotes[r.id]||quotes[r.id].foreign);
+  if(bad.length){ out.innerHTML='<div class="warnbox">Нет корректной цены для: '+bad.map(r=>r.id).join(', ')+'. Уберите их или замените.</div>'; return; }
+  let cash = +$('contrib').value||0;
+  const items = S.rules.map(r=>({id:r.id, q:quotes[r.id], target:r.target/100, have:r.have||0, buyLots:0, sellLots:0}));
+  const value = it => it.q.price*it.have + it.q.lotPrice*(it.buyLots-it.sellLots);
+  const totalNow = items.reduce((a,it)=>a+it.q.price*it.have,0);
+  // продажа лишнего (по желанию): продаём лоты бумаг, доля которых превышена больше чем на пол-лота
+  if($('allowSell').checked){
+    const total = totalNow + cash;
+    for(const it of items){
+      while(it.have - (it.sellLots+1)*it.q.lot >= 0 && value(it) - it.target*total >= it.q.lotPrice/2){ it.sellLots++; cash += it.q.lotPrice*(1-fee(it.id)); }
+    }
+  }
+  const total = totalNow + (+$('contrib').value||0);
+  // покупка: каждый раз докупаем лот той бумаги, которой сильнее всего не хватает до своей доли
+  let guard = 0;
+  while(guard++ < 10000){
+    let best=null, bestGap=0;
+    for(const it of items){
+      if(it.q.lotPrice*(1+fee(it.id)) > cash) continue;
+      const gap = it.target*total - value(it);
+      if(gap >= it.q.lotPrice/2 && gap > bestGap){ best=it; bestGap=gap; }
+    }
+    if(!best) break;
+    best.buyLots++; cash -= best.q.lotPrice*(1+fee(best.id));
+  }
+  const lines = items.filter(it=>it.buyLots||it.sellLots);
+  const totalAfter = items.reduce((a,it)=>a+value(it),0);
+  out.innerHTML = (lines.length ? `<div class="tbl"><table><tr><th>Действие</th><th>Бумага</th><th class="num">Лотов</th><th class="num">Штук</th><th class="num">≈ Сумма</th><th class="num">Доля после</th><th class="num">Хотела</th></tr>`+
+    lines.map(it=>{ const buy = it.buyLots>0; const lots = buy?it.buyLots:it.sellLots;
+      return `<tr><td class="${buy?'good':'bad'}">${buy?'Купить':'Продать'}</td><td><b>${it.id}</b> <span class="muted">${esc(it.q.name)}</span></td><td class="num">${lots}</td><td class="num">${lots*it.q.lot}</td><td class="num">${fmt(lots*it.q.lotPrice)} ₽</td><td class="num">${fmt(value(it)/totalAfter*100,1)}%</td><td class="num">${fmt(it.target*100,1)}%</td></tr>`; }).join('')+'</table></div>'
+    : '<div class="warnbox">На эту сумму по вашим правилам ничего не нужно докупать — либо доли уже в порядке, либо лот дороже свободных денег.</div>') +
+    `<div class="row"><span>Останется свободных денег: <b>${fmt(cash)} ₽</b></span></div>
+     <div class="hint">Расчёт по текущей цене. В момент покупки цена может немного отличаться, комиссия брокера (0,3%, фонды Т-Капитала без неё) уже учтена, но оставляйте небольшой запас. Посчитано только по вашим правилам: калькулятор не знает, вырастет бумага или упадёт.</div>`;
+};
+
+// ---------- фильтр ----------
+let screenData = [], sortKey = 'weight', sortDir = -1;
+async function historyCloses(daysBack){
+  const d = new Date(); d.setDate(d.getDate()-daysBack);
+  for(let tries=0; tries<7; tries++, d.setDate(d.getDate()-1)){
+    const ds = d.toISOString().slice(0,10); const res = {};
+    let start = 0, total = 1;
+    while(start < total){
+      const j = await getJSON(`${ISS}/history/engines/stock/markets/shares/boards/TQBR/securities.json?iss.meta=off&date=${ds}&start=${start}&history.columns=SECID,CLOSE`);
+      rows(j.history).forEach(r=>{ if(r.CLOSE) res[r.SECID]=r.CLOSE; });
+      const cur = rows(j['history.cursor'])[0]; total = cur?cur.TOTAL:0; start += cur?cur.PAGESIZE:100;
+    }
+    if(Object.keys(res).length) return res;
+  }
+  return {};
+}
+$('loadScreen').onclick = async ()=>{
+  $('screenStatus').textContent='Загружаю данные биржи… (10–20 секунд)';
+  try{
+    const [sec, idx, y1, y3] = await Promise.all([
+      getJSON(`${ISS}/engines/stock/markets/shares/boards/TQBR/securities.json?iss.meta=off&iss.only=securities,marketdata&securities.columns=SECID,SHORTNAME,LOTSIZE,PREVPRICE&marketdata.columns=SECID,LAST,MARKETPRICE,VALTODAY,ISSUECAPITALIZATION,LASTTOPREVPRICE`),
+      getJSON(`${ISS}/statistics/engines/stock/markets/index/analytics/IMOEX.json?iss.meta=off&limit=100`),
+      historyCloses(365), historyCloses(365*3)
+    ]);
+    const md = Object.fromEntries(rows(sec.marketdata).map(r=>[r.SECID,r]));
+    const w = Object.fromEntries(rows(idx.analytics).map(r=>[r.secids,r.weight]));
+    // биржа отдаёт цены без поправки на сплиты/консолидации: слишком резкое изменение помечаем, а не показываем
+    const chg = (now, old, lo, hi) => { if(!old) return [null,false]; const k = now/old; return (k<lo||k>hi) ? [null,true] : [(k-1)*100,false]; };
+    screenData = rows(sec.securities).map(s=>{ const m=md[s.SECID]||{}; const price = m.LAST ?? m.MARKETPRICE ?? s.PREVPRICE;
+      const [c1,b1] = chg(price, y1[s.SECID], 0.25, 4), [c3,b3] = chg(price, y3[s.SECID], 0.15, 6);
+      return {id:s.SECID, name:s.SHORTNAME, price, lot:s.LOTSIZE, lotPrice: price*s.LOTSIZE, turn:(m.VALTODAY||0)/1e6, cap:(m.ISSUECAPITALIZATION||0)/1e9,
+        day:m.LASTTOPREVPRICE, weight:w[s.SECID]??null, y1:c1, y1Bad:b1, y3:c3, y3Bad:b3}; })
+      .filter(r=>r.price);
+    $('screenStatus').textContent = `Загружено ${screenData.length} бумаг. Оборот — за сегодня с начала торгов.`;
+    renderScreen();
+  }catch(e){ $('screenStatus').textContent='Ошибка: '+e.message; }
+};
+['fIndex','fTurn','fY1min','fY1max','fLot','fText'].forEach(id=>$(id).oninput=()=>screenData.length&&renderScreen());
+function renderScreen(){
+  const fi=$('fIndex').checked, ft=+$('fTurn').value||0, a=$('fY1min').value, b=$('fY1max').value, fl=+$('fLot').value||0, tx=$('fText').value.trim().toLowerCase();
+  let d = screenData.filter(r=>(!fi||r.weight!=null) && r.turn>=ft && (a===''||(r.y1!=null&&r.y1>=+a)) && (b===''||(r.y1!=null&&r.y1<=+b)) && (!fl||r.lotPrice<=fl) && (!tx||(r.name+r.id).toLowerCase().includes(tx)));
+  d.sort((x,y)=>((x[sortKey]??-1e18)>(y[sortKey]??-1e18)?1:-1)*sortDir);
+  const cols=[['id','Тикер'],['name','Название'],['price','Цена','num',2],['lotPrice','Лот, ₽','num',0],['day','Сегодня, %','num',2],['y1','За год, %','num',1],['y3','За 3 года, %','num',1],['weight','Вес в индексе, %','num',2],['turn','Оборот, млн ₽','num',0],['cap','Капитализация, млрд ₽','num',0]];
+  const cls = v => v==null?'':(v>=0?'good':'bad');
+  $('screenTbl').innerHTML = '<tr>'+cols.map(c=>`<th class="sort ${c[2]||''}" data-k="${c[0]}">${c[1]}${sortKey===c[0]?(sortDir>0?' ↑':' ↓'):''}</th>`).join('')+'<th></th></tr>'+
+    d.map(r=>'<tr>'+cols.map(c=>{ const v=r[c[0]]; if(!c[2]) return `<td>${c[0]==='id'?'<b>'+esc(v)+'</b>':esc(v)}</td>`;
+      if(r[c[0]+'Bad']) return `<td class="num muted" title="Был сплит или консолидация акций — биржевая цена тех лет несравнима с нынешней">сплит?</td>`;
+      return `<td class="num ${['day','y1','y3'].includes(c[0])?cls(v):''}">${fmt(v,c[3])}</td>`; }).join('')+
+      `<td><button class="g" data-add="${r.id}">в правила</button></td></tr>`).join('') ;
+  $('screenTbl').querySelectorAll('th.sort').forEach(th=>th.onclick=()=>{ if(sortKey===th.dataset.k) sortDir*=-1; else {sortKey=th.dataset.k; sortDir=-1;} renderScreen(); });
+  $('screenTbl').querySelectorAll('[data-add]').forEach(btn=>btn.onclick=()=>{ const id=btn.dataset.add;
+    if(!S.rules.some(r=>r.id===id)){ const r=screenData.find(x=>x.id===id); quotes[id]={name:r.name,kind:'акция/фонд',lot:r.lot,price:r.price,lotPrice:r.lotPrice}; S.rules.push({id,target:0,have:0}); save(); renderRules(); }
+    btn.textContent='добавлено'; btn.disabled=true; });
+  $('screenStatus').textContent = `Показано ${d.length} из ${screenData.length}.`;
+}
+
+// ---------- журнал ----------
+$('jDate').value = new Date().toISOString().slice(0,10);
+$('jAdd').onclick = ()=>{
+  const e = {id:Date.now(), date:$('jDate').value, side:$('jSide').value, ticker:$('jTicker').value.trim().toUpperCase(), qty:+$('jQty').value, price:+$('jPrice').value, why:$('jWhy').value.trim(), result:''};
+  if(!e.ticker||!e.qty||!e.price){ $('jStatus').textContent='Заполните тикер, количество и цену'; return; }
+  if(!e.why){ $('jStatus').textContent='Напишите хотя бы одну фразу «почему» — в этом весь смысл журнала'; return; }
+  S.journal.unshift(e); save(); ['jTicker','jQty','jPrice','jWhy'].forEach(i=>$(i).value=''); $('jStatus').textContent='Записано'; renderJournal();
+};
+async function renderJournal(){
+  const t=$('jTbl');
+  if(!S.journal.length){ t.innerHTML='<tr><td class="muted">Записей пока нет.</td></tr>'; return; }
+  const draw = ()=>{ const today=new Date();
+    t.innerHTML='<tr><th>Дата</th><th>Сделка</th><th class="num">Штук</th><th class="num">Цена</th><th class="num">Сейчас</th><th class="num">Изменение</th><th>Почему</th><th>Что вышло</th><th></th></tr>'+
+    S.journal.map((e,i)=>{ const q=quotes[e.ticker]; const ch = q? (q.price/e.price-1)*100*(e.side==='buy'?1:-1) : null;
+      const due = !e.result && (today-new Date(e.date))/864e5 >= 30;
+      return `<tr style="${due?'background:var(--warn)':''}"><td>${esc(e.date)}${due?'<div style="font-size:12px">пора подвести итог</div>':''}</td><td class="${e.side==='buy'?'good':'bad'}">${e.side==='buy'?'Купила':'Продала'} <b>${esc(e.ticker)}</b></td>
+      <td class="num">${fmt(e.qty)}</td><td class="num">${fmt(e.price,2)}</td><td class="num">${q?fmt(q.price,2):'—'}</td><td class="num ${ch==null?'':ch>=0?'good':'bad'}">${ch==null?'—':(ch>0?'+':'')+fmt(ch,1)+'%'}</td>
+      <td style="white-space:normal;min-width:200px">${esc(e.why)}</td>
+      <td style="min-width:200px"><textarea data-r="${i}" placeholder="Итог и вывод">${esc(e.result)}</textarea></td>
+      <td><button class="x" data-jdel="${i}" title="Удалить">×</button></td></tr>`; }).join('');
+    t.querySelectorAll('[data-r]').forEach(a=>a.onchange=()=>{ S.journal[a.dataset.r].result=a.value; save(); draw(); });
+    t.querySelectorAll('[data-jdel]').forEach(b=>b.onclick=()=>{ if(confirm('Удалить запись?')){ S.journal.splice(+b.dataset.jdel,1); save(); draw(); } }); };
+  draw();
+  try{ await refreshQuotes(S.journal.map(e=>e.ticker)); draw(); }catch(e){}
+}
+
+// ---------- резервная копия ----------
+$('expBtn').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='инвестиции-копия-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+  $('bStatus').textContent='Файл скачан — перенесите его в папку D:\\Мои проекты\\инвестиции';
+};
+$('impFile').onchange = async ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  try{ const d = JSON.parse(await f.text()); if(!Array.isArray(d.rules)||!Array.isArray(d.journal)) throw new Error('не тот файл');
+    if(!confirm('Заменить текущие данные данными из файла?')) return; S=d; save(); renderRules(); renderJournal(); refreshCalc(); $('bStatus').textContent='Загружено';
+  }catch(e){ $('bStatus').textContent='Ошибка: '+e.message; }
+};
+
+renderRules(); if(S.rules.length) refreshCalc();
+</script>
+</body>
+</html>
