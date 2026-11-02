@@ -138,12 +138,25 @@
 <script>
 const ISS = 'https://iss.moex.com/iss';
 const KEY = 'invest-app-v1';
-// Набор, выбранный 30.10.2026 (вариант 1 + денежный рынок на остаток); подставляется, пока в браузере ничего не сохранено
+// Схема «проба 10+5» от 02.11.2026: 2/3 пополнения — денежный рынок, 1/3 — акции и фонд на индекс.
+// Подставляется, пока в браузере нет своих данных или там лежит прошлая заготовка без купленных бумаг.
+const PRESET = 2;
 const DEFAULT_RULES = [
-  {id:'YDEX', target:23, have:0}, {id:'HEAD', target:18, have:0}, {id:'DOMRF', target:14, have:0},
-  {id:'TRNFP', target:7, have:0}, {id:'TMOS', target:23, have:0}, {id:'TMON', target:15, have:0}];
+  {id:'TMON', target:67, have:0}, {id:'YDEX', target:9, have:0}, {id:'TMOS', target:9, have:0},
+  {id:'HEAD', target:7, have:0}, {id:'DOMRF', target:5, have:0}, {id:'TRNFP', target:3, have:0}];
+const fresh = () => ({rules:DEFAULT_RULES.map(r=>({...r})), journal:[], preset:PRESET});
 let S = load();
-function load(){ try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s) return Object.assign({rules:[],journal:[]}, s);}catch(e){} return {rules:DEFAULT_RULES.map(r=>({...r})),journal:[]}; }
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if(s){
+      const st = Object.assign({rules:[],journal:[]}, s);
+      if((st.preset||1) < PRESET && st.rules.every(r=>!r.have)) return Object.assign(st, {rules:fresh().rules, preset:PRESET});
+      return st;
+    }
+  }catch(e){}
+  return fresh();
+}
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ alert('Не удалось сохранить: '+e.message); } }
 const $ = id => document.getElementById(id);
 const fmt = (n,d=0) => n==null||isNaN(n) ? '—' : n.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -261,6 +274,9 @@ $('planBtn').onclick = async ()=>{
     if(!best) break;
     best.buyLots++; cash -= best.q.lotPrice*(1+fee(best.id));
   }
+  // остаток, на который не хватает целой акции, не лежит без дела — уходит в денежный рынок; акции доберутся в следующие месяцы
+  const park = items.find(it=>['TMON','LQDT'].includes(it.id));
+  if(park){ const c = park.q.lotPrice*(1+fee(park.id)); while(cash >= c){ park.buyLots++; cash -= c; } }
   const lines = items.filter(it=>it.buyLots||it.sellLots);
   const totalAfter = items.reduce((a,it)=>a+value(it),0);
   out.innerHTML = (lines.length ? `<div class="tbl"><table><tr><th>Действие</th><th>Бумага</th><th class="num">Лотов</th><th class="num">Штук</th><th class="num">≈ Сумма</th><th class="num">Доля после</th><th class="num">Хотела</th></tr>`+
